@@ -27,8 +27,6 @@ export default function BattleDashboard({
     const deckMap = new Map<string, DeckStat>();
 
     battles.forEach((battle) => {
-      // Create a unique ID for the deck (Sorted names joined by comma)
-      // This ensures order doesn't matter
       const myCards = battle.match_data.my_cards || [];
       if (myCards.length === 0) return;
 
@@ -48,7 +46,6 @@ export default function BattleDashboard({
       deckMap.set(deckId, current);
     });
 
-    // Convert to array and sort by most played
     return Array.from(deckMap.values())
       .map(d => ({ ...d, winRate: Math.round((d.wins / d.games) * 100) }))
       .sort((a, b) => b.games - a.games);
@@ -70,13 +67,11 @@ export default function BattleDashboard({
 
   return (
     <div className="space-y-8">
-      
-      {/* Deck Selector */}
+
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-xl font-bold text-white mb-4">Filter by Your Deck</h2>
         
         <div className="flex flex-wrap gap-4">
-          {/* "All Decks" Option */}
           <button
             onClick={() => setSelectedDeckId(null)}
             className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-32 ${
@@ -89,7 +84,6 @@ export default function BattleDashboard({
             <span className="text-xs mt-1">{battles.length} Games</span>
           </button>
 
-          {/* Individual Decks */}
           {myDecks.slice(0, 5).map((deck) => (
             <button
               key={deck.id}
@@ -100,11 +94,9 @@ export default function BattleDashboard({
                   : "bg-gray-800 border-transparent hover:bg-gray-750"
               }`}
             >
-              {/* Mini Card Grid */}
               <div className="grid grid-cols-4 gap-1 mb-2 w-32">
                 {deck.cards.map((card) => (
                   <div key={card.name} className="relative w-7 h-9 bg-black/50 rounded overflow-hidden">
-                     {/* Use img for simplicity, fallback to gray box */}
                      {cardImages[card.name] && (
                        <img 
                          src={cardImages[card.name]} 
@@ -116,7 +108,6 @@ export default function BattleDashboard({
                 ))}
               </div>
               
-              {/* Deck Stats */}
               <div className="flex justify-between items-center w-full px-1">
                 <span className={`text-xs font-bold ${
                   deck.winRate >= 50 ? "text-green-400" : "text-red-400"
@@ -132,7 +123,6 @@ export default function BattleDashboard({
         </div>
       </section>
 
-      {/* Dynamic Header */}
       <div className="flex items-center gap-2 pb-4 border-b border-gray-800">
         <h2 className="text-2xl font-bold text-white">
           {selectedDeckId ? "Deck Performance" : "Overall Performance"}
@@ -142,7 +132,6 @@ export default function BattleDashboard({
         </span>
       </div>
 
-      {/* Child Components - Now receiving FILTERED data */}
       <section>
         <OpponentStatsGrid battles={filteredBattles} cardImages={cardImages} />
       </section>
@@ -152,7 +141,6 @@ export default function BattleDashboard({
         <CardPairStats battles={filteredBattles} cardImages={cardImages} />
       </section>
 
-      {/* Filtered Match List */}
       <section>
         <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
         <div className="space-y-2">
@@ -172,8 +160,8 @@ export default function BattleDashboard({
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-xs text-gray-500 block">
-                  {new Date(battle.battle_time).toLocaleDateString()}
+                <span className="text-xs text-gray-500 block" suppressHydrationWarning>
+                  {new Date(battle.battle_time).toLocaleString()}
                 </span>
                 <span className={`text-sm font-bold uppercase ${
                   battle.result === 'victory' ? 'text-green-400' : 
