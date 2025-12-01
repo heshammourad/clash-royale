@@ -52,13 +52,23 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
         ...stat,
         winRate: (stat.wins / stat.encounters) * 100
       }))
-      .filter(stat => stat.encounters >= minEncounters)
-      .sort((a, b) => b.winRate - a.winRate); 
+      .filter(stat => stat.encounters >= minEncounters);
 
   }, [battles]);
 
-  const bestMatchups = pairStats.slice(0, 10);
-  const worstMatchups = [...pairStats].sort((a, b) => a.winRate - b.winRate).slice(0, 10);
+  // 1. Sort Best: Win Rate High -> Low, then Wins High -> Low
+  const bestMatchups = [...pairStats].sort((a, b) => {
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+    return b.wins - a.wins; // 4-0 beats 3-0
+  }).slice(0, 10);
+
+  // 2. Sort Worst: Win Rate Low -> High, then Losses High -> Low
+  const worstMatchups = [...pairStats].sort((a, b) => {
+    if (a.winRate !== b.winRate) return a.winRate - b.winRate;
+    const lossesA = a.encounters - a.wins;
+    const lossesB = b.encounters - b.wins;
+    return lossesB - lossesA; // 0-4 beats 0-3 (meaning 0-4 is "worse" for you)
+  }).slice(0, 10);
 
   const MatchupRow = ({ stat, rank }: { stat: PairStat, rank: number }) => (
     <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg border border-gray-700 mb-2">

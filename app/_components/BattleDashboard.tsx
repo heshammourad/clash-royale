@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Battle, Card } from "../types";
 import OpponentStatsGrid from "./OpponentStatsGrid";
 import CardPairStats from "./CardPairStats";
-import MatchHistory from "./MatchHistory"; // New Import
+import MatchHistory from "./MatchHistory";
 
 interface DeckStat {
   id: string; 
@@ -22,7 +22,7 @@ export default function BattleDashboard({
   cardImages: Record<string, string> 
 }) {
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
-  const [historyPage, setHistoryPage] = useState(1); // Pagination State
+  const [historyPage, setHistoryPage] = useState(1);
   const MATCHES_PER_PAGE = 10;
 
   // 1. Identify Unique Decks
@@ -68,7 +68,25 @@ export default function BattleDashboard({
     });
   }, [battles, selectedDeckId]);
 
-  // 3. Paginate Battles for History View
+  // 3. Calculate Overall Stats for Header
+  const overallStats = useMemo(() => {
+    let wins = 0;
+    let losses = 0;
+    let draws = 0;
+
+    filteredBattles.forEach(b => {
+      if (b.result === 'victory') wins++;
+      else if (b.result === 'defeat') losses++;
+      else draws++;
+    });
+
+    const total = wins + losses + draws;
+    const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+
+    return { wins, losses, draws, winRate };
+  }, [filteredBattles]);
+
+  // 4. Paginate Battles for History View
   const paginatedHistory = useMemo(() => {
     const start = (historyPage - 1) * MATCHES_PER_PAGE;
     return filteredBattles.slice(start, start + MATCHES_PER_PAGE);
@@ -76,7 +94,6 @@ export default function BattleDashboard({
 
   const totalPages = Math.ceil(filteredBattles.length / MATCHES_PER_PAGE);
 
-  // Helper to change deck and reset page
   const handleDeckSelect = (deckId: string | null) => {
     setSelectedDeckId(deckId);
     setHistoryPage(1);
@@ -141,14 +158,31 @@ export default function BattleDashboard({
         </div>
       </section>
 
-      {/* Stats Components */}
-      <div className="flex items-center gap-2 pb-4 border-b border-gray-800">
+      {/* Dynamic Header with W-L Record */}
+      <div className="flex flex-wrap items-end gap-4 pb-4 border-b border-gray-800">
         <h2 className="text-2xl font-bold text-white">
           {selectedDeckId ? "Deck Performance" : "Overall Performance"}
         </h2>
-        <span className="text-sm text-gray-500 bg-gray-900 px-2 py-1 rounded-full">
-          {filteredBattles.length} Matches Analyzed
-        </span>
+        
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
+            {filteredBattles.length} Matches
+          </span>
+
+          <span className="text-sm font-bold bg-gray-900 px-4 py-1 rounded-full border border-gray-800 flex items-center gap-1.5 shadow-sm">
+            <span className={`mr-2 ${overallStats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+              {overallStats.winRate}%
+            </span>
+            <span className="text-green-400">{overallStats.wins}W</span>
+            <span className="text-gray-600">-</span>
+            <span className="text-red-400">{overallStats.losses}L</span>
+            {overallStats.draws > 0 && (
+              <span className="text-gray-500 ml-1 border-l border-gray-700 pl-2">
+                {overallStats.draws}D
+              </span>
+            )}
+          </span>
+        </div>
       </div>
 
       <section>
@@ -160,12 +194,10 @@ export default function BattleDashboard({
         <CardPairStats battles={filteredBattles} cardImages={cardImages} />
       </section>
 
-      {/* Match History (Paginated) */}
       <section>
-        <h3 className="text-xl font-bold text-white mb-4">Recent Matches</h3>
+        <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
         <MatchHistory battles={paginatedHistory} cardImages={cardImages} />
         
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-6">
             <button
