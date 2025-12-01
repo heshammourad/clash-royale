@@ -4,9 +4,10 @@ import { useState, useMemo } from "react";
 import { Battle, Card } from "../types";
 import OpponentStatsGrid from "./OpponentStatsGrid";
 import CardPairStats from "./CardPairStats";
+import MatchHistory from "./MatchHistory"; // New Import
 
 interface DeckStat {
-  id: string; // Unique string signature of the deck
+  id: string; 
   cards: Card[];
   games: number;
   wins: number;
@@ -21,6 +22,8 @@ export default function BattleDashboard({
   cardImages: Record<string, string> 
 }) {
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1); // Pagination State
+  const MATCHES_PER_PAGE = 10;
 
   // 1. Identify Unique Decks
   const myDecks = useMemo(() => {
@@ -65,16 +68,31 @@ export default function BattleDashboard({
     });
   }, [battles, selectedDeckId]);
 
+  // 3. Paginate Battles for History View
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * MATCHES_PER_PAGE;
+    return filteredBattles.slice(start, start + MATCHES_PER_PAGE);
+  }, [filteredBattles, historyPage]);
+
+  const totalPages = Math.ceil(filteredBattles.length / MATCHES_PER_PAGE);
+
+  // Helper to change deck and reset page
+  const handleDeckSelect = (deckId: string | null) => {
+    setSelectedDeckId(deckId);
+    setHistoryPage(1);
+  };
+
   return (
     <div className="space-y-8">
-
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h2 className="text-xl font-bold text-white mb-4">Filter by Your Deck</h2>
+      
+      {/* Deck Selector */}
+      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6 overflow-x-auto">
+        <h2 className="text-xl font-bold text-white mb-4 sticky left-0">Filter by Your Deck</h2>
         
-        <div className="flex flex-wrap gap-4">
+        <div className="flex gap-4 min-w-min">
           <button
-            onClick={() => setSelectedDeckId(null)}
-            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-32 ${
+            onClick={() => handleDeckSelect(null)}
+            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-32 shrink-0 ${
               selectedDeckId === null
                 ? "bg-blue-900/20 border-blue-500 text-white"
                 : "bg-gray-800 border-transparent text-gray-400 hover:bg-gray-700"
@@ -84,11 +102,11 @@ export default function BattleDashboard({
             <span className="text-xs mt-1">{battles.length} Games</span>
           </button>
 
-          {myDecks.slice(0, 5).map((deck) => (
+          {myDecks.slice(0, 10).map((deck) => (
             <button
               key={deck.id}
-              onClick={() => setSelectedDeckId(deck.id)}
-              className={`relative group flex flex-col p-3 rounded-xl border-2 transition-all ${
+              onClick={() => handleDeckSelect(deck.id)}
+              className={`relative group flex flex-col p-3 rounded-xl border-2 transition-all shrink-0 ${
                 selectedDeckId === deck.id
                   ? "bg-blue-900/20 border-blue-500"
                   : "bg-gray-800 border-transparent hover:bg-gray-750"
@@ -123,6 +141,7 @@ export default function BattleDashboard({
         </div>
       </section>
 
+      {/* Stats Components */}
       <div className="flex items-center gap-2 pb-4 border-b border-gray-800">
         <h2 className="text-2xl font-bold text-white">
           {selectedDeckId ? "Deck Performance" : "Overall Performance"}
@@ -141,38 +160,33 @@ export default function BattleDashboard({
         <CardPairStats battles={filteredBattles} cardImages={cardImages} />
       </section>
 
+      {/* Match History (Paginated) */}
       <section>
-        <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
-        <div className="space-y-2">
-          {filteredBattles.slice(0, 10).map((battle) => (
-            <div 
-              key={`${battle.player_tag}-${battle.battle_time}`}
-              className="p-3 rounded-lg bg-gray-900 border border-gray-800 flex justify-between items-center"
+        <h3 className="text-xl font-bold text-white mb-4">Recent Matches</h3>
+        <MatchHistory battles={paginatedHistory} cardImages={cardImages} />
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-6">
+            <button
+              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+              disabled={historyPage === 1}
+              className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors"
             >
-              <div className="flex items-center gap-4">
-                <div className={`w-2 h-12 rounded-full ${
-                  battle.result === 'victory' ? 'bg-green-500' : 
-                  battle.result === 'defeat' ? 'bg-red-500' : 'bg-yellow-500'
-                }`} />
-                <div>
-                  <p className="font-bold text-white text-sm">{battle.game_mode}</p>
-                  <p className="text-xs text-gray-500">vs {battle.opponent_tag}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-500 block" suppressHydrationWarning>
-                  {new Date(battle.battle_time).toLocaleString()}
-                </span>
-                <span className={`text-sm font-bold uppercase ${
-                  battle.result === 'victory' ? 'text-green-400' : 
-                  battle.result === 'defeat' ? 'text-red-400' : 'text-yellow-400'
-                }`}>
-                  {battle.result}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+              Previous
+            </button>
+            <span className="text-sm text-gray-400">
+              Page {historyPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))}
+              disabled={historyPage === totalPages}
+              className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </section>
 
     </div>

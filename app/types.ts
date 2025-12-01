@@ -6,14 +6,15 @@ export interface Card {
 
 export interface Battle {
   battle_time: string;
+  round_id: number;
   result: string;
   game_mode: string;
   player_tag: string;
   opponent_tag: string;
   match_data: {
-    my_cards: Card[];       // <-- Added this to fix the error
+    my_cards: Card[];
     opponent_cards: Card[];
-    my_crowns?: number;     // Optional but available in your DB
+    my_crowns?: number;
     opponent_crowns?: number;
   };
 }
