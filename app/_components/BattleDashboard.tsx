@@ -1,0 +1,192 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { Battle, Card } from "../types";
+import OpponentStatsGrid from "./OpponentStatsGrid";
+import CardPairStats from "./CardPairStats";
+
+interface DeckStat {
+  id: string; // Unique string signature of the deck
+  cards: Card[];
+  games: number;
+  wins: number;
+  winRate: number;
+}
+
+export default function BattleDashboard({ 
+  battles, 
+  cardImages 
+}: { 
+  battles: Battle[], 
+  cardImages: Record<string, string> 
+}) {
+  const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+
+  // 1. Identify Unique Decks
+  const myDecks = useMemo(() => {
+    const deckMap = new Map<string, DeckStat>();
+
+    battles.forEach((battle) => {
+      // Create a unique ID for the deck (Sorted names joined by comma)
+      // This ensures order doesn't matter
+      const myCards = battle.match_data.my_cards || [];
+      if (myCards.length === 0) return;
+
+      const sortedCards = [...myCards].sort((a, b) => a.name.localeCompare(b.name));
+      const deckId = sortedCards.map(c => c.name).join(',');
+
+      const current = deckMap.get(deckId) || { 
+        id: deckId, 
+        cards: sortedCards, 
+        games: 0, 
+        wins: 0, 
+        winRate: 0 
+      };
+
+      current.games += 1;
+      if (battle.result === 'victory') current.wins += 1;
+      deckMap.set(deckId, current);
+    });
+
+    // Convert to array and sort by most played
+    return Array.from(deckMap.values())
+      .map(d => ({ ...d, winRate: Math.round((d.wins / d.games) * 100) }))
+      .sort((a, b) => b.games - a.games);
+  }, [battles]);
+
+  // 2. Filter Battles
+  const filteredBattles = useMemo(() => {
+    if (!selectedDeckId) return battles;
+    
+    return battles.filter(b => {
+      const myCards = b.match_data.my_cards || [];
+      const deckId = [...myCards]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(c => c.name)
+        .join(',');
+      return deckId === selectedDeckId;
+    });
+  }, [battles, selectedDeckId]);
+
+  return (
+    <div className="space-y-8">
+      
+      {/* Deck Selector */}
+      <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h2 className="text-xl font-bold text-white mb-4">Filter by Your Deck</h2>
+        
+        <div className="flex flex-wrap gap-4">
+          {/* "All Decks" Option */}
+          <button
+            onClick={() => setSelectedDeckId(null)}
+            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all w-32 ${
+              selectedDeckId === null
+                ? "bg-blue-900/20 border-blue-500 text-white"
+                : "bg-gray-800 border-transparent text-gray-400 hover:bg-gray-700"
+            }`}
+          >
+            <span className="text-lg font-bold">All Decks</span>
+            <span className="text-xs mt-1">{battles.length} Games</span>
+          </button>
+
+          {/* Individual Decks */}
+          {myDecks.slice(0, 5).map((deck) => (
+            <button
+              key={deck.id}
+              onClick={() => setSelectedDeckId(deck.id)}
+              className={`relative group flex flex-col p-3 rounded-xl border-2 transition-all ${
+                selectedDeckId === deck.id
+                  ? "bg-blue-900/20 border-blue-500"
+                  : "bg-gray-800 border-transparent hover:bg-gray-750"
+              }`}
+            >
+              {/* Mini Card Grid */}
+              <div className="grid grid-cols-4 gap-1 mb-2 w-32">
+                {deck.cards.map((card) => (
+                  <div key={card.name} className="relative w-7 h-9 bg-black/50 rounded overflow-hidden">
+                     {/* Use img for simplicity, fallback to gray box */}
+                     {cardImages[card.name] && (
+                       <img 
+                         src={cardImages[card.name]} 
+                         alt={card.name}
+                         className="object-cover w-full h-full" 
+                       />
+                     )}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Deck Stats */}
+              <div className="flex justify-between items-center w-full px-1">
+                <span className={`text-xs font-bold ${
+                  deck.winRate >= 50 ? "text-green-400" : "text-red-400"
+                }`}>
+                  {deck.winRate}% WR
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {deck.games} Games
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Dynamic Header */}
+      <div className="flex items-center gap-2 pb-4 border-b border-gray-800">
+        <h2 className="text-2xl font-bold text-white">
+          {selectedDeckId ? "Deck Performance" : "Overall Performance"}
+        </h2>
+        <span className="text-sm text-gray-500 bg-gray-900 px-2 py-1 rounded-full">
+          {filteredBattles.length} Matches Analyzed
+        </span>
+      </div>
+
+      {/* Child Components - Now receiving FILTERED data */}
+      <section>
+        <OpponentStatsGrid battles={filteredBattles} cardImages={cardImages} />
+      </section>
+
+      <section className="bg-gray-900/50 p-6 rounded-xl border border-gray-800">
+        <h2 className="text-2xl font-bold text-white mb-6">Synergy Analysis</h2>
+        <CardPairStats battles={filteredBattles} cardImages={cardImages} />
+      </section>
+
+      {/* Filtered Match List */}
+      <section>
+        <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
+        <div className="space-y-2">
+          {filteredBattles.slice(0, 10).map((battle) => (
+            <div 
+              key={`${battle.player_tag}-${battle.battle_time}`}
+              className="p-3 rounded-lg bg-gray-900 border border-gray-800 flex justify-between items-center"
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-2 h-12 rounded-full ${
+                  battle.result === 'victory' ? 'bg-green-500' : 
+                  battle.result === 'defeat' ? 'bg-red-500' : 'bg-yellow-500'
+                }`} />
+                <div>
+                  <p className="font-bold text-white text-sm">{battle.game_mode}</p>
+                  <p className="text-xs text-gray-500">vs {battle.opponent_tag}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-gray-500 block">
+                  {new Date(battle.battle_time).toLocaleDateString()}
+                </span>
+                <span className={`text-sm font-bold uppercase ${
+                  battle.result === 'victory' ? 'text-green-400' : 
+                  battle.result === 'defeat' ? 'text-red-400' : 'text-yellow-400'
+                }`}>
+                  {battle.result}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+    </div>
+  );
+}
