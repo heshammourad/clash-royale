@@ -1,13 +1,20 @@
 import { sql } from "@vercel/postgres";
-import CardPairStats from "./_components/CardPairStats"; // New Import
 import OpponentStatsGrid from "./_components/OpponentStatsGrid";
+import CardPairStats from "./_components/CardPairStats";
 import { fetchCardImages } from "./lib/api";
+import { Battle } from "./types"; 
+import type { Metadata } from "next";
 
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = {
+  title: "Clash Royale Dashboard",
+  description: "Analyze your battle history, win rates, and opponent card synergies.",
+};
+
 export default async function Home() {
   const [battleData, cardImages] = await Promise.all([
-    sql`
+    sql<Battle>`
       SELECT * FROM battles 
       WHERE battle_time >= NOW() - INTERVAL '30 days'
       ORDER BY battle_time DESC;
@@ -38,7 +45,7 @@ export default async function Home() {
           <OpponentStatsGrid battles={rows} cardImages={cardImages} />
         </section>
 
-        {/* Section 2: Pair Synergies (New) */}
+        {/* Section 2: Pair Synergies */}
         <section className="bg-gray-900/50 p-6 rounded-xl border border-gray-800">
           <h2 className="text-2xl font-bold text-white mb-6">Synergy Analysis</h2>
           <CardPairStats battles={rows} cardImages={cardImages} />

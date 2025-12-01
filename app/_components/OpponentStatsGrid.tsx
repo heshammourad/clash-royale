@@ -1,25 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Battle } from "../types";
 
-// --- Types ---
-interface Card {
-  name: string;
-  level: number;
-  evolution_level?: number; // Added this field
-}
-
-interface Battle {
-  battle_time: string;
-  result: string;
-  match_data: {
-    opponent_cards: Card[];
-  };
-}
-
+// Local interface for the calculated stat
 interface CardStat {
   name: string;
-  isEvo: boolean;     // New flag for styling
+  isEvo: boolean;
   encounters: number; 
   wins: number;       
   winRate: number;    
@@ -38,15 +25,12 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
     battles.forEach((battle) => {
       const isWin = battle.result === "victory";
       
-      // Use Set to handle duplicates within a single deck (Mirror, etc.)
       const uniqueCardsInDeck = new Set<string>();
 
       battle.match_data?.opponent_cards?.forEach((c) => {
-        // If it's evolved, modify the name to treat it as a distinct card stats-wise
         const keyName = (c.evolution_level && c.evolution_level > 0) 
           ? `${c.name} (Evo)` 
           : c.name;
-        
         uniqueCardsInDeck.add(keyName);
       });
 
@@ -83,7 +67,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
       let valA = sortMetric === "usage" ? a.usageRate : a.winRate;
       let valB = sortMetric === "usage" ? b.usageRate : b.winRate;
 
-      // Secondary sort: Encounters (Sample size)
       if (valA === valB) {
         valA = a.encounters;
         valB = b.encounters;
@@ -105,7 +88,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
   return (
     <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
       
-      {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-xl font-bold text-gray-100">Opponent Card Stats</h2>
         
@@ -133,7 +115,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
         </div>
       </div>
 
-      {/* The Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
         {sortedStats.map((stat) => (
           <div 
@@ -144,12 +125,10 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
                 : "bg-gray-800 border-gray-700 hover:border-gray-500"
             }`}
           >
-            {/* Evo Indicator Background Effect */}
             {stat.isEvo && (
                 <div className="absolute -top-6 -right-6 w-12 h-12 bg-purple-500 blur-xl opacity-40"></div>
             )}
 
-            {/* Card Image */}
             <div className={`relative w-16 h-20 mb-2 ${stat.isEvo ? "scale-110" : ""}`}>
               {cardImages[stat.name] ? (
                 <img
@@ -167,7 +146,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
               )}
             </div>
 
-            {/* Usage Bar */}
             <div className="w-full mb-1 z-10">
               <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
                 <span>Usage</span>
@@ -184,7 +162,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
               </div>
             </div>
 
-            {/* Win Rate Bar */}
             <div className="w-full z-10">
               <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
                 <span>Win</span>
