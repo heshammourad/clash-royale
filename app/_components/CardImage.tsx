@@ -1,20 +1,23 @@
 "use client";
 
+import { useCardAssets } from "../_context/CardAssetsContext";
+
 interface CardImageProps {
   name: string;
   evolutionLevel?: number; // 0 = Normal, 1 = Evo, 2 = Hero
-  cardImages: Record<string, string>;
   className?: string;
-  withRing?: boolean; // New prop to toggle visual borders
+  withRing?: boolean;
 }
 
 export default function CardImage({ 
   name, 
   evolutionLevel = 0, 
-  cardImages, 
   className = "",
   withRing = false
 }: CardImageProps) {
+  // Grab images from context instead of props
+  const cardImages = useCardAssets();
+  
   const isHero = evolutionLevel === 2;
   const isEvo = evolutionLevel === 1;
 
@@ -36,16 +39,9 @@ export default function CardImage({
   // Determine Ring Styles
   const getRingClasses = () => {
     if (!withRing) return "";
-    
-    if (isHero) {
-      return "ring-1 ring-amber-500/50 shadow-[0_0_4px_rgba(245,158,11,0.4)]";
-    }
-    
-    if (isEvo) {
-      return "ring-1 ring-purple-500/50 shadow-[0_0_4px_rgba(168,85,247,0.4)]";
-    }
-    
-    return "ring-1 ring-gray-700"; // Subtle ring for standard cards
+    if (isHero) return "ring-1 ring-amber-500/50 shadow-[0_0_4px_rgba(245,158,11,0.4)]";
+    if (isEvo) return "ring-1 ring-purple-500/50 shadow-[0_0_4px_rgba(168,85,247,0.4)]";
+    return "ring-1 ring-gray-700";
   };
 
   const ringClasses = getRingClasses();

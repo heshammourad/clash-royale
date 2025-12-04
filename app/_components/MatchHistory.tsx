@@ -21,7 +21,8 @@ const formatGameMode = (mode: string) => {
   }
 };
 
-const DeckGrid = ({ cards, cardImages }: { cards: Card[], cardImages: Record<string, string> }) => {
+// Removed cardImages prop from DeckGrid
+const DeckGrid = ({ cards }: { cards: Card[] }) => {
   const safeCards = [...(cards || []), ...Array(8)].slice(0, 8);
 
   return (
@@ -32,7 +33,6 @@ const DeckGrid = ({ cards, cardImages }: { cards: Card[], cardImages: Record<str
             <CardImage 
               name={card.name}
               evolutionLevel={card.evolution_level}
-              cardImages={cardImages}
               className="w-full h-full"
             />
           ) : (
@@ -44,7 +44,8 @@ const DeckGrid = ({ cards, cardImages }: { cards: Card[], cardImages: Record<str
   );
 };
 
-export default function MatchHistory({ battles, cardImages }: { battles: Battle[], cardImages: Record<string, string> }) {
+// Removed cardImages prop from Main Component
+export default function MatchHistory({ battles }: { battles: Battle[] }) {
   return (
     <div className="space-y-3">
       {battles.map((battle) => {
@@ -76,9 +77,10 @@ export default function MatchHistory({ battles, cardImages }: { battles: Battle[
             </div>
 
             <div className="flex flex-1 items-center justify-between gap-4 w-full">
+              
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-gray-400 uppercase font-bold">You</span>
-                <DeckGrid cards={battle.match_data.my_cards} cardImages={cardImages} />
+                <DeckGrid cards={battle.match_data.my_cards} />
               </div>
 
               <div className="flex flex-col items-center justify-center px-2">
@@ -96,7 +98,7 @@ export default function MatchHistory({ battles, cardImages }: { battles: Battle[
                 <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[80px]">
                   {battle.opponent_tag}
                 </span>
-                <DeckGrid cards={battle.match_data.opponent_cards} cardImages={cardImages} />
+                <DeckGrid cards={battle.match_data.opponent_cards} />
               </div>
             </div>
           </div>

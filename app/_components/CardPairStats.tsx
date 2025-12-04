@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { Battle } from "../types";
 import CardImage from "./CardImage";
 
-// Helper structure to track identity
 interface CardId {
   name: string;
   evolutionLevel: number;
@@ -18,22 +17,20 @@ interface PairStat {
   winRate: number;
 }
 
-export default function CardPairStats({ battles, cardImages = {} }: { battles: Battle[], cardImages?: Record<string, string> }) {
+// Removed cardImages prop
+export default function CardPairStats({ battles }: { battles: Battle[] }) {
   
   const pairStats = useMemo(() => {
-    // Key: "NameA|LvlA__NameB|LvlB"
     const pairMap = new Map<string, { cardA: CardId; cardB: CardId; encounters: number; wins: number }>();
 
     battles.forEach((battle) => {
       const isWin = battle.result === "victory";
-      
       const uniqueCards = new Set<string>();
+      
       battle.match_data?.opponent_cards?.forEach((c) => {
-        // Store unique key as "Name|Level"
         uniqueCards.add(`${c.name}|${c.evolution_level || 0}`);
       });
 
-      // Convert back to objects and sort by name to ensure A+B is treated same as B+A
       const cards: CardId[] = Array.from(uniqueCards)
         .map(key => {
           const [name, levelStr] = key.split('|');
@@ -45,13 +42,10 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
           return a.evolutionLevel - b.evolutionLevel;
         });
 
-      // Generate pairs
       for (let i = 0; i < cards.length; i++) {
         for (let j = i + 1; j < cards.length; j++) {
           const cardA = cards[i];
           const cardB = cards[j];
-          
-          // Composite key
           const pairKey = `${cardA.name}|${cardA.evolutionLevel}__${cardB.name}|${cardB.evolutionLevel}`;
 
           const current = pairMap.get(pairKey) || { cardA, cardB, encounters: 0, wins: 0 };
@@ -94,7 +88,6 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
       <div className="flex items-center gap-3">
         <span className="text-gray-500 font-mono text-sm w-4">#{rank}</span>
         
-        {/* Changed from -space-x-3 to gap-2 to fix overlapping */}
         <div className="flex gap-2">
           {[stat.cardA, stat.cardB].map((card) => {
             return (
@@ -105,8 +98,7 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
                 <CardImage
                   name={card.name}
                   evolutionLevel={card.evolutionLevel}
-                  cardImages={cardImages}
-                  withRing={true} // Use the new prop
+                  withRing={true} 
                   className="w-full h-full"
                 />
               </div>

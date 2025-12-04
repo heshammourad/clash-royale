@@ -6,30 +6,28 @@ import CardImage from "./CardImage";
 
 interface CardStat {
   name: string;
-  evolutionLevel: number; // 0, 1, or 2
+  evolutionLevel: number;
   encounters: number; 
   wins: number;       
   winRate: number;    
   usageRate: number;  
 }
 
-export default function OpponentStatsGrid({ battles, cardImages = {} }: { battles: Battle[], cardImages?: Record<string, string> }) {
+// Removed cardImages from props
+export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
   const [sortMetric, setSortMetric] = useState<"usage" | "winRate">("usage");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // 1. Aggregate Data
   const stats = useMemo(() => {
-    // Map Key: "Name|Level" (e.g. "Knight|1") to ensure uniqueness
     const cardMap = new Map<string, { name: string; evolutionLevel: number; encounters: number; wins: number }>();
     const totalBattles = battles.length;
 
     battles.forEach((battle) => {
       const isWin = battle.result === "victory";
-      // Use Set to handle duplicates or mirror interactions safely
       const uniqueCardsInDeck = new Set<string>();
 
       battle.match_data?.opponent_cards?.forEach((c) => {
-        // Create a unique composite key for aggregation
         const key = `${c.name}|${c.evolution_level || 0}`;
         uniqueCardsInDeck.add(key);
       });
@@ -41,15 +39,14 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
         const current = cardMap.get(key) || { name, evolutionLevel, encounters: 0, wins: 0 };
         
         cardMap.set(key, {
-          name, // Store clean base name
-          evolutionLevel, // Store actual level
+          name, 
+          evolutionLevel, 
           encounters: current.encounters + 1,
           wins: current.wins + (isWin ? 1 : 0),
         });
       });
     });
 
-    // Convert Map to Array
     const statsArray: CardStat[] = [];
     cardMap.forEach((data) => {
       statsArray.push({
@@ -110,7 +107,6 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
 
           return (
             <div 
-              // Key must still be unique for React list
               key={`${stat.name}-${stat.evolutionLevel}`} 
               className={`flex flex-col items-center p-3 rounded-lg border transition-all relative overflow-hidden ${
                   isHero
@@ -125,9 +121,8 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
 
               <div className={`relative w-16 h-20 mb-2 ${(isEvo || isHero) ? "scale-110" : ""}`}>
                 <CardImage
-                  name={stat.name} // Clean name passed directly!
-                  evolutionLevel={stat.evolutionLevel} // Integer level passed directly!
-                  cardImages={cardImages}
+                  name={stat.name}
+                  evolutionLevel={stat.evolutionLevel}
                   className="w-full h-full"
                 />
               </div>
