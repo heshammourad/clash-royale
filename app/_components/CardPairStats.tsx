@@ -17,9 +17,7 @@ interface PairStat {
   winRate: number;
 }
 
-// Removed cardImages prop
 export default function CardPairStats({ battles }: { battles: Battle[] }) {
-  
   const pairStats = useMemo(() => {
     const pairMap = new Map<string, { cardA: CardId; cardB: CardId; encounters: number; wins: number }>();
 

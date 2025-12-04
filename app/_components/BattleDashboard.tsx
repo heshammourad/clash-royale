@@ -17,16 +17,17 @@ interface DeckStat {
 }
 
 export default function BattleDashboard({ 
-  battles, 
-  cardImages 
+  battles,
+  cardImages
 }: { 
-  battles: Battle[], 
-  cardImages: Record<string, string> 
+  battles: Battle[],
+  cardImages: Record<string, string>
 }) {
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [historyPage, setHistoryPage] = useState(1);
   const MATCHES_PER_PAGE = 10;
 
+  // Helper: Generates a deterministic ID for a deck based on content (Alphabetical)
   const getDeckId = (cards: Card[]) => {
     return [...cards]
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -38,6 +39,24 @@ export default function BattleDashboard({
       .join(',');
   };
 
+  // Helper: Sorts cards for visual display (Evo -> Hero -> Regular)
+  const sortCardsForDisplay = (cards: Card[]) => {
+    return [...cards].sort((a, b) => {
+      const getPriority = (level?: number) => {
+        if (level === 1) return 0; // Evo First
+        if (level === 2) return 1; // Hero Second
+        return 2;                  // Regular Last
+      };
+
+      const pA = getPriority(a.evolution_level);
+      const pB = getPriority(b.evolution_level);
+      
+      if (pA !== pB) return pA - pB;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  // 1. Identify Unique Decks
   const myDecks = useMemo(() => {
     const deckMap = new Map<string, DeckStat>();
 
@@ -46,7 +65,9 @@ export default function BattleDashboard({
       if (myCards.length === 0) return;
 
       const deckId = getDeckId(myCards);
-      const sortedCards = [...myCards].sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Store the properly sorted cards for visual display
+      const sortedCards = sortCardsForDisplay(myCards);
 
       const current = deckMap.get(deckId) || { 
         id: deckId, 
@@ -66,6 +87,7 @@ export default function BattleDashboard({
       .sort((a, b) => b.games - a.games);
   }, [battles]);
 
+  // 2. Filter Battles
   const filteredBattles = useMemo(() => {
     if (!selectedDeckId) return battles;
     return battles.filter(b => {
@@ -74,6 +96,7 @@ export default function BattleDashboard({
     });
   }, [battles, selectedDeckId]);
 
+  // 3. Stats logic
   const overallStats = useMemo(() => {
     let wins = 0; let losses = 0; let draws = 0;
     filteredBattles.forEach(b => {
@@ -99,7 +122,6 @@ export default function BattleDashboard({
   };
 
   return (
-    // Wrap everything in the Provider
     <CardAssetsProvider images={cardImages}>
       <div className="space-y-8">
         
@@ -134,7 +156,6 @@ export default function BattleDashboard({
                       <CardImage
                           name={card.name}
                           evolutionLevel={card.evolution_level}
-                          // No longer passing cardImages prop!
                           className="w-full h-full"
                       />
                     </div>
@@ -171,7 +192,6 @@ export default function BattleDashboard({
           </div>
         </div>
 
-        {/* Removed cardImages prop from all these children */}
         <section>
           <OpponentStatsGrid battles={filteredBattles} />
         </section>

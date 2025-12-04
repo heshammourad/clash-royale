@@ -13,7 +13,6 @@ interface CardStat {
   usageRate: number;  
 }
 
-// Removed cardImages from props
 export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
   const [sortMetric, setSortMetric] = useState<"usage" | "winRate">("usage");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");

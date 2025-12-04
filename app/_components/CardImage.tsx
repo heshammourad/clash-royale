@@ -3,61 +3,60 @@
 import { useCardAssets } from "../_context/CardAssetsContext";
 
 interface CardImageProps {
-  name: string;
-  evolutionLevel?: number; // 0 = Normal, 1 = Evo, 2 = Hero
-  className?: string;
-  withRing?: boolean;
+    name: string;
+    evolutionLevel?: number; // 0 = Normal, 1 = Evo, 2 = Hero
+    className?: string;
+    withRing?: boolean;
 }
 
-export default function CardImage({ 
-  name, 
-  evolutionLevel = 0, 
-  className = "",
-  withRing = false
+export default function CardImage({
+    name,
+    evolutionLevel = 0,
+    className = "",
+    withRing = false
 }: CardImageProps) {
-  // Grab images from context instead of props
-  const cardImages = useCardAssets();
-  
-  const isHero = evolutionLevel === 2;
-  const isEvo = evolutionLevel === 1;
+    const cardImages = useCardAssets();
 
-  // Resolve Image Source
-  const getSource = () => {
-    if (isHero) {
-      const cleanName = name.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '');
-      return `/heroes/${cleanName}.png`;
-    }
-    
-    if (isEvo) {
-      const evoKey = `${name} (Evo)`;
-      if (cardImages[evoKey]) return cardImages[evoKey];
-    }
+    const isHero = evolutionLevel === 2;
+    const isEvo = evolutionLevel === 1;
 
-    return cardImages[name] || "";
-  };
+    // Resolve Image Source
+    const getSource = () => {
+        if (isHero) {
+            const cleanName = name.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '');
+            return `/heroes/${cleanName}.png`;
+        }
 
-  // Determine Ring Styles
-  const getRingClasses = () => {
-    if (!withRing) return "";
-    if (isHero) return "ring-1 ring-amber-500/50 shadow-[0_0_4px_rgba(245,158,11,0.4)]";
-    if (isEvo) return "ring-1 ring-purple-500/50 shadow-[0_0_4px_rgba(168,85,247,0.4)]";
-    return "ring-1 ring-gray-700";
-  };
+        if (isEvo) {
+            const evoKey = `${name} (Evo)`;
+            if (cardImages[evoKey]) return cardImages[evoKey];
+        }
 
-  const ringClasses = getRingClasses();
+        return cardImages[name] || "";
+    };
 
-  return (
-    <div className={`relative ${ringClasses} ${className} rounded-sm`}>
-      <img
-        src={getSource()}
-        alt={name}
-        className="w-full h-full object-contain drop-shadow-sm rounded-sm"
-        loading="lazy"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.style.opacity = "0.3";
-        }}
-      />
-    </div>
-  );
+    // Determine Ring Styles
+    const getRingClasses = () => {
+        if (!withRing) return "";
+        if (isHero) return "ring-1 ring-amber-500/50 shadow-[0_0_4px_rgba(245,158,11,0.4)]";
+        if (isEvo) return "ring-1 ring-purple-500/50 shadow-[0_0_4px_rgba(168,85,247,0.4)]";
+        return "ring-1 ring-gray-700";
+    };
+
+    const ringClasses = getRingClasses();
+
+    return (
+        <div className={`relative ${ringClasses} ${className} rounded-sm`}>
+            <img
+                src={getSource()}
+                alt={name}
+                className="w-full h-full object-contain drop-shadow-sm rounded-sm"
+                loading="lazy"
+                onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.opacity = "0.3";
+                }}
+            />
+        </div>
+    );
 }

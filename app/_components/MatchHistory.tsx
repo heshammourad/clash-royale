@@ -21,7 +21,6 @@ const formatGameMode = (mode: string) => {
   }
 };
 
-// Removed cardImages prop from DeckGrid
 const DeckGrid = ({ cards }: { cards: Card[] }) => {
   const safeCards = [...(cards || []), ...Array(8)].slice(0, 8);
 
@@ -44,7 +43,6 @@ const DeckGrid = ({ cards }: { cards: Card[] }) => {
   );
 };
 
-// Removed cardImages prop from Main Component
 export default function MatchHistory({ battles }: { battles: Battle[] }) {
   return (
     <div className="space-y-3">
