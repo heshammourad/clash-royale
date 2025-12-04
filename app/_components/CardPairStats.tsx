@@ -2,10 +2,17 @@
 
 import { useMemo } from "react";
 import { Battle } from "../types";
+import CardImage from "./CardImage";
+
+// Helper structure to track identity
+interface CardId {
+  name: string;
+  evolutionLevel: number;
+}
 
 interface PairStat {
-  cardA: string;
-  cardB: string;
+  cardA: CardId;
+  cardB: CardId;
   encounters: number;
   wins: number;
   winRate: number;
@@ -14,28 +21,42 @@ interface PairStat {
 export default function CardPairStats({ battles, cardImages = {} }: { battles: Battle[], cardImages?: Record<string, string> }) {
   
   const pairStats = useMemo(() => {
-    const pairMap = new Map<string, { cardA: string; cardB: string; encounters: number; wins: number }>();
+    // Key: "NameA|LvlA__NameB|LvlB"
+    const pairMap = new Map<string, { cardA: CardId; cardB: CardId; encounters: number; wins: number }>();
 
     battles.forEach((battle) => {
       const isWin = battle.result === "victory";
       
       const uniqueCards = new Set<string>();
       battle.match_data?.opponent_cards?.forEach((c) => {
-        const name = (c.evolution_level && c.evolution_level > 0) ? `${c.name} (Evo)` : c.name;
-        uniqueCards.add(name);
+        // Store unique key as "Name|Level"
+        uniqueCards.add(`${c.name}|${c.evolution_level || 0}`);
       });
 
-      const cards = Array.from(uniqueCards).sort(); 
+      // Convert back to objects and sort by name to ensure A+B is treated same as B+A
+      const cards: CardId[] = Array.from(uniqueCards)
+        .map(key => {
+          const [name, levelStr] = key.split('|');
+          return { name, evolutionLevel: parseInt(levelStr, 10) };
+        })
+        .sort((a, b) => {
+          const nameCompare = a.name.localeCompare(b.name);
+          if (nameCompare !== 0) return nameCompare;
+          return a.evolutionLevel - b.evolutionLevel;
+        });
 
+      // Generate pairs
       for (let i = 0; i < cards.length; i++) {
         for (let j = i + 1; j < cards.length; j++) {
           const cardA = cards[i];
           const cardB = cards[j];
-          const key = `${cardA}|${cardB}`;
-
-          const current = pairMap.get(key) || { cardA, cardB, encounters: 0, wins: 0 };
           
-          pairMap.set(key, {
+          // Composite key
+          const pairKey = `${cardA.name}|${cardA.evolutionLevel}__${cardB.name}|${cardB.evolutionLevel}`;
+
+          const current = pairMap.get(pairKey) || { cardA, cardB, encounters: 0, wins: 0 };
+          
+          pairMap.set(pairKey, {
             cardA, 
             cardB,
             encounters: current.encounters + 1,
@@ -56,18 +77,16 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
 
   }, [battles]);
 
-  // 1. Sort Best: Win Rate High -> Low, then Wins High -> Low
   const bestMatchups = [...pairStats].sort((a, b) => {
     if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-    return b.wins - a.wins; // 4-0 beats 3-0
+    return b.wins - a.wins;
   }).slice(0, 10);
 
-  // 2. Sort Worst: Win Rate Low -> High, then Losses High -> Low
   const worstMatchups = [...pairStats].sort((a, b) => {
     if (a.winRate !== b.winRate) return a.winRate - b.winRate;
     const lossesA = a.encounters - a.wins;
     const lossesB = b.encounters - b.wins;
-    return lossesB - lossesA; // 0-4 beats 0-3 (meaning 0-4 is "worse" for you)
+    return lossesB - lossesA;
   }).slice(0, 10);
 
   const MatchupRow = ({ stat, rank }: { stat: PairStat, rank: number }) => (
@@ -75,23 +94,24 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
       <div className="flex items-center gap-3">
         <span className="text-gray-500 font-mono text-sm w-4">#{rank}</span>
         
-        <div className="flex -space-x-3">
-          {[stat.cardA, stat.cardB].map((name) => (
-            <div key={name} className="relative w-10 h-12 z-0 first:z-10 hover:z-20 transition-all hover:scale-110">
-              {cardImages[name] ? (
-                <img 
-                  src={cardImages[name]} 
-                  alt={name} 
-                  className="object-contain w-full h-full drop-shadow-md"
-                  loading="lazy"
+        {/* Changed from -space-x-3 to gap-2 to fix overlapping */}
+        <div className="flex gap-2">
+          {[stat.cardA, stat.cardB].map((card) => {
+            return (
+              <div 
+                key={`${card.name}-${card.evolutionLevel}`} 
+                className="relative w-10 h-12 transition-all hover:scale-110 rounded-sm bg-gray-900"
+              >
+                <CardImage
+                  name={card.name}
+                  evolutionLevel={card.evolutionLevel}
+                  cardImages={cardImages}
+                  withRing={true} // Use the new prop
+                  className="w-full h-full"
                 />
-              ) : (
-                <div className="w-full h-full bg-gray-700 rounded flex items-center justify-center text-[8px] text-center">
-                  {name.split(' ')[0]}
-                </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -112,7 +132,6 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
       <div>
         <h3 className="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
           <span>🛡️ Best Matchups</span>
@@ -120,7 +139,7 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
         </h3>
         <div className="space-y-1">
           {bestMatchups.map((stat, i) => (
-            <MatchupRow key={`${stat.cardA}-${stat.cardB}`} stat={stat} rank={i + 1} />
+            <MatchupRow key={`${stat.cardA.name}-${stat.cardB.name}`} stat={stat} rank={i + 1} />
           ))}
         </div>
       </div>
@@ -132,11 +151,10 @@ export default function CardPairStats({ battles, cardImages = {} }: { battles: B
         </h3>
         <div className="space-y-1">
           {worstMatchups.map((stat, i) => (
-            <MatchupRow key={`${stat.cardA}-${stat.cardB}`} stat={stat} rank={i + 1} />
+            <MatchupRow key={`${stat.cardA.name}-${stat.cardB.name}`} stat={stat} rank={i + 1} />
           ))}
         </div>
       </div>
-
     </div>
   );
 }

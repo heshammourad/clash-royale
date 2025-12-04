@@ -2,11 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { Battle } from "../types";
+import CardImage from "./CardImage";
 
-// Local interface for the calculated stat
 interface CardStat {
   name: string;
-  isEvo: boolean;
+  evolutionLevel: number; // 0, 1, or 2
   encounters: number; 
   wins: number;       
   winRate: number;    
@@ -19,38 +19,42 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
 
   // 1. Aggregate Data
   const stats = useMemo(() => {
-    const cardMap = new Map<string, { encounters: number; wins: number; isEvo: boolean }>();
+    // Map Key: "Name|Level" (e.g. "Knight|1") to ensure uniqueness
+    const cardMap = new Map<string, { name: string; evolutionLevel: number; encounters: number; wins: number }>();
     const totalBattles = battles.length;
 
     battles.forEach((battle) => {
       const isWin = battle.result === "victory";
-      
+      // Use Set to handle duplicates or mirror interactions safely
       const uniqueCardsInDeck = new Set<string>();
 
       battle.match_data?.opponent_cards?.forEach((c) => {
-        const keyName = (c.evolution_level && c.evolution_level > 0) 
-          ? `${c.name} (Evo)` 
-          : c.name;
-        uniqueCardsInDeck.add(keyName);
+        // Create a unique composite key for aggregation
+        const key = `${c.name}|${c.evolution_level || 0}`;
+        uniqueCardsInDeck.add(key);
       });
 
-      uniqueCardsInDeck.forEach((keyName) => {
-        const isEvo = keyName.endsWith("(Evo)");
-        const current = cardMap.get(keyName) || { encounters: 0, wins: 0, isEvo };
+      uniqueCardsInDeck.forEach((key) => {
+        const [name, levelStr] = key.split('|');
+        const evolutionLevel = parseInt(levelStr, 10);
+
+        const current = cardMap.get(key) || { name, evolutionLevel, encounters: 0, wins: 0 };
         
-        cardMap.set(keyName, {
+        cardMap.set(key, {
+          name, // Store clean base name
+          evolutionLevel, // Store actual level
           encounters: current.encounters + 1,
           wins: current.wins + (isWin ? 1 : 0),
-          isEvo
         });
       });
     });
 
+    // Convert Map to Array
     const statsArray: CardStat[] = [];
-    cardMap.forEach((data, name) => {
+    cardMap.forEach((data) => {
       statsArray.push({
-        name,
-        isEvo: data.isEvo,
+        name: data.name,
+        evolutionLevel: data.evolutionLevel,
         encounters: data.encounters,
         wins: data.wins,
         winRate: (data.wins / data.encounters) * 100,
@@ -87,103 +91,72 @@ export default function OpponentStatsGrid({ battles, cardImages = {} }: { battle
 
   return (
     <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-      
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-xl font-bold text-gray-100">Opponent Card Stats</h2>
-        
         <div className="flex gap-2 text-sm">
-          <button
-            onClick={() => handleSort("usage")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              sortMetric === "usage" 
-                ? "bg-blue-600 text-white" 
-                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-            }`}
-          >
+          <button onClick={() => handleSort("usage")} className={`px-4 py-2 rounded-lg font-medium transition-colors ${sortMetric === "usage" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
             Sort by Usage {sortMetric === "usage" && (sortDirection === "desc" ? "↓" : "↑")}
           </button>
-          <button
-            onClick={() => handleSort("winRate")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              sortMetric === "winRate" 
-                ? "bg-blue-600 text-white" 
-                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-            }`}
-          >
+          <button onClick={() => handleSort("winRate")} className={`px-4 py-2 rounded-lg font-medium transition-colors ${sortMetric === "winRate" ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
             Sort by Win Rate {sortMetric === "winRate" && (sortDirection === "desc" ? "↓" : "↑")}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-        {sortedStats.map((stat) => (
-          <div 
-            key={stat.name} 
-            className={`flex flex-col items-center p-3 rounded-lg border transition-all relative overflow-hidden ${
-                stat.isEvo 
-                ? "bg-purple-900/20 border-purple-500/50 hover:border-purple-400" 
-                : "bg-gray-800 border-gray-700 hover:border-gray-500"
-            }`}
-          >
-            {stat.isEvo && (
-                <div className="absolute -top-6 -right-6 w-12 h-12 bg-purple-500 blur-xl opacity-40"></div>
-            )}
+        {sortedStats.map((stat) => {
+          const isEvo = stat.evolutionLevel === 1;
+          const isHero = stat.evolutionLevel === 2;
 
-            <div className={`relative w-16 h-20 mb-2 ${stat.isEvo ? "scale-110" : ""}`}>
-              {cardImages[stat.name] ? (
-                <img
-                  src={cardImages[stat.name]}
-                  alt={stat.name}
-                  className="object-contain drop-shadow-md w-full h-full"
-                  loading="lazy"
+          return (
+            <div 
+              // Key must still be unique for React list
+              key={`${stat.name}-${stat.evolutionLevel}`} 
+              className={`flex flex-col items-center p-3 rounded-lg border transition-all relative overflow-hidden ${
+                  isHero
+                  ? "bg-amber-900/20 border-amber-500/50 hover:border-amber-400"
+                  : isEvo 
+                  ? "bg-purple-900/20 border-purple-500/50 hover:border-purple-400" 
+                  : "bg-gray-800 border-gray-700 hover:border-gray-500"
+              }`}
+            >
+              {isEvo && <div className="absolute -top-6 -right-6 w-12 h-12 bg-purple-500 blur-xl opacity-40"></div>}
+              {isHero && <div className="absolute -top-6 -right-6 w-12 h-12 bg-amber-500 blur-xl opacity-40"></div>}
+
+              <div className={`relative w-16 h-20 mb-2 ${(isEvo || isHero) ? "scale-110" : ""}`}>
+                <CardImage
+                  name={stat.name} // Clean name passed directly!
+                  evolutionLevel={stat.evolutionLevel} // Integer level passed directly!
+                  cardImages={cardImages}
+                  className="w-full h-full"
                 />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-800 rounded">
-                  <span className="text-[10px] text-gray-500 text-center px-1 break-words">
-                    {stat.name}
-                  </span>
+              </div>
+
+              <div className="w-full mb-1 z-10">
+                <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
+                  <span>Usage</span>
+                  <span>{Math.round(stat.usageRate)}%</span>
                 </div>
-              )}
-            </div>
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${stat.usageRate}%` }} />
+                </div>
+                <div className="text-[9px] text-gray-500 text-right mt-0.5">{stat.encounters}/{battles.length}</div>
+              </div>
 
-            <div className="w-full mb-1 z-10">
-              <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
-                <span>Usage</span>
-                <span>{Math.round(stat.usageRate)}%</span>
+              <div className="w-full z-10">
+                <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
+                  <span>Win</span>
+                  <span className={stat.winRate >= 50 ? "text-green-400" : "text-red-400"}>{Math.round(stat.winRate)}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${stat.winRate >= 50 ? "bg-green-500" : "bg-red-500"}`} style={{ width: `${stat.winRate}%` }} />
+                </div>
+                <div className="text-[9px] text-gray-500 text-right mt-0.5">{stat.wins}/{stat.encounters}</div>
               </div>
-              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full" 
-                  style={{ width: `${stat.usageRate}%` }} 
-                />
-              </div>
-              <div className="text-[9px] text-gray-500 text-right mt-0.5">
-                {stat.encounters}/{battles.length}
-              </div>
-            </div>
 
-            <div className="w-full z-10">
-              <div className="flex justify-between text-[10px] text-gray-400 mb-0.5 uppercase font-bold tracking-wider">
-                <span>Win</span>
-                <span className={stat.winRate >= 50 ? "text-green-400" : "text-red-400"}>
-                  {Math.round(stat.winRate)}%
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${
-                    stat.winRate >= 50 ? "bg-green-500" : "bg-red-500"
-                  }`}
-                  style={{ width: `${stat.winRate}%` }} 
-                />
-              </div>
-              <div className="text-[9px] text-gray-500 text-right mt-0.5">
-                {stat.wins}/{stat.encounters}
-              </div>
             </div>
-
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

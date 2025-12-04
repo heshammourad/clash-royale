@@ -5,6 +5,7 @@ import { Battle, Card } from "../types";
 import OpponentStatsGrid from "./OpponentStatsGrid";
 import CardPairStats from "./CardPairStats";
 import MatchHistory from "./MatchHistory";
+import CardImage from "./CardImage";
 
 interface DeckStat {
   id: string; 
@@ -25,7 +26,17 @@ export default function BattleDashboard({
   const [historyPage, setHistoryPage] = useState(1);
   const MATCHES_PER_PAGE = 10;
 
-  // 1. Identify Unique Decks
+  const getDeckId = (cards: Card[]) => {
+    return [...cards]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(c => {
+        if (c.evolution_level === 1) return `${c.name}(Evo)`;
+        if (c.evolution_level === 2) return `${c.name}(Hero)`;
+        return c.name;
+      })
+      .join(',');
+  };
+
   const myDecks = useMemo(() => {
     const deckMap = new Map<string, DeckStat>();
 
@@ -33,8 +44,25 @@ export default function BattleDashboard({
       const myCards = battle.match_data.my_cards || [];
       if (myCards.length === 0) return;
 
-      const sortedCards = [...myCards].sort((a, b) => a.name.localeCompare(b.name));
-      const deckId = sortedCards.map(c => c.name).join(',');
+      const deckId = getDeckId(myCards);
+      
+      // Custom Sort: Evo (1) -> Hero (2) -> Regular (0) -> Alphabetical
+      const sortedCards = [...myCards].sort((a, b) => {
+        const getPriority = (level?: number) => {
+          if (level === 1) return 0; // Evo First
+          if (level === 2) return 1; // Hero Second
+          return 2;                  // Regular Last
+        };
+
+        const priorityA = getPriority(a.evolution_level);
+        const priorityB = getPriority(b.evolution_level);
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        return a.name.localeCompare(b.name);
+      });
 
       const current = deckMap.get(deckId) || { 
         id: deckId, 
@@ -54,39 +82,26 @@ export default function BattleDashboard({
       .sort((a, b) => b.games - a.games);
   }, [battles]);
 
-  // 2. Filter Battles
   const filteredBattles = useMemo(() => {
     if (!selectedDeckId) return battles;
-    
     return battles.filter(b => {
       const myCards = b.match_data.my_cards || [];
-      const deckId = [...myCards]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(c => c.name)
-        .join(',');
-      return deckId === selectedDeckId;
+      return getDeckId(myCards) === selectedDeckId;
     });
   }, [battles, selectedDeckId]);
 
-  // 3. Calculate Overall Stats for Header
   const overallStats = useMemo(() => {
-    let wins = 0;
-    let losses = 0;
-    let draws = 0;
-
+    let wins = 0; let losses = 0; let draws = 0;
     filteredBattles.forEach(b => {
       if (b.result === 'victory') wins++;
       else if (b.result === 'defeat') losses++;
       else draws++;
     });
-
     const total = wins + losses + draws;
     const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-
     return { wins, losses, draws, winRate };
   }, [filteredBattles]);
 
-  // 4. Paginate Battles for History View
   const paginatedHistory = useMemo(() => {
     const start = (historyPage - 1) * MATCHES_PER_PAGE;
     return filteredBattles.slice(start, start + MATCHES_PER_PAGE);
@@ -102,10 +117,8 @@ export default function BattleDashboard({
   return (
     <div className="space-y-8">
       
-      {/* Deck Selector */}
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6 overflow-x-auto">
         <h2 className="text-xl font-bold text-white mb-4 sticky left-0">Filter by Your Deck</h2>
-        
         <div className="flex gap-4 min-w-min">
           <button
             onClick={() => handleDeckSelect(null)}
@@ -130,45 +143,37 @@ export default function BattleDashboard({
               }`}
             >
               <div className="grid grid-cols-4 gap-1 mb-2 w-32">
-                {deck.cards.map((card) => (
-                  <div key={card.name} className="relative w-7 h-9 bg-black/50 rounded overflow-hidden">
-                     {cardImages[card.name] && (
-                       <img 
-                         src={cardImages[card.name]} 
-                         alt={card.name}
-                         className="object-cover w-full h-full" 
-                       />
-                     )}
+                {deck.cards.map((card, i) => (
+                  <div key={i} className="relative w-7 h-9 bg-black/50 rounded overflow-hidden">
+                     <CardImage
+                        name={card.name}
+                        evolutionLevel={card.evolution_level}
+                        cardImages={cardImages}
+                        className="w-full h-full"
+                        withRing
+                     />
                   </div>
                 ))}
               </div>
-              
               <div className="flex justify-between items-center w-full px-1">
-                <span className={`text-xs font-bold ${
-                  deck.winRate >= 50 ? "text-green-400" : "text-red-400"
-                }`}>
+                <span className={`text-xs font-bold ${deck.winRate >= 50 ? "text-green-400" : "text-red-400"}`}>
                   {deck.winRate}% WR
                 </span>
-                <span className="text-[10px] text-gray-500">
-                  {deck.games} Games
-                </span>
+                <span className="text-[10px] text-gray-500">{deck.games} Games</span>
               </div>
             </button>
           ))}
         </div>
       </section>
 
-      {/* Dynamic Header with W-L Record */}
       <div className="flex flex-wrap items-end gap-4 pb-4 border-b border-gray-800">
         <h2 className="text-2xl font-bold text-white">
           {selectedDeckId ? "Deck Performance" : "Overall Performance"}
         </h2>
-        
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
             {filteredBattles.length} Matches
           </span>
-
           <span className="text-sm font-bold bg-gray-900 px-4 py-1 rounded-full border border-gray-800 flex items-center gap-1.5 shadow-sm">
             <span className={`mr-2 ${overallStats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
               {overallStats.winRate}%
@@ -176,11 +181,7 @@ export default function BattleDashboard({
             <span className="text-green-400">{overallStats.wins}W</span>
             <span className="text-gray-600">-</span>
             <span className="text-red-400">{overallStats.losses}L</span>
-            {overallStats.draws > 0 && (
-              <span className="text-gray-500 ml-1 border-l border-gray-700 pl-2">
-                {overallStats.draws}D
-              </span>
-            )}
+            {overallStats.draws > 0 && <span className="text-gray-500 ml-1 border-l border-gray-700 pl-2">{overallStats.draws}D</span>}
           </span>
         </div>
       </div>
@@ -197,26 +198,11 @@ export default function BattleDashboard({
       <section>
         <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
         <MatchHistory battles={paginatedHistory} cardImages={cardImages} />
-        
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-6">
-            <button
-              onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-              disabled={historyPage === 1}
-              className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-400">
-              Page {historyPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))}
-              disabled={historyPage === totalPages}
-              className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors"
-            >
-              Next
-            </button>
+            <button onClick={() => setHistoryPage((p) => Math.max(1, p - 1))} disabled={historyPage === 1} className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors">Previous</button>
+            <span className="text-sm text-gray-400">Page {historyPage} of {totalPages}</span>
+            <button onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))} disabled={historyPage === totalPages} className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-bold disabled:opacity-50 hover:bg-gray-700 transition-colors">Next</button>
           </div>
         )}
       </section>
