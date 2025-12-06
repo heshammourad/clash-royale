@@ -64,15 +64,15 @@ export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
   // 2. Sort Data
   const sortedStats = useMemo(() => {
     return [...stats].sort((a, b) => {
-      let valA = sortMetric === "usage" ? a.usageRate : a.winRate;
-      let valB = sortMetric === "usage" ? b.usageRate : b.winRate;
+      const primaryA = sortMetric === "usage" ? a.usageRate : a.winRate;
+      const primaryB = sortMetric === "usage" ? b.usageRate : b.winRate;
 
-      if (valA === valB) {
-        valA = a.encounters;
-        valB = b.encounters;
+      if (primaryA !== primaryB) {
+        return sortDirection === "desc" ? primaryB - primaryA : primaryA - primaryB;
       }
 
-      return sortDirection === "desc" ? valB - valA : valA - valB;
+      // Secondary sort: by encounters, always descending (more frequent first)
+      return b.encounters - a.encounters;
     });
   }, [stats, sortMetric, sortDirection]);
 
