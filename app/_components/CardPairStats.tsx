@@ -17,7 +17,19 @@ interface PairStat {
   winRate: number;
 }
 
-export default function CardPairStats({ battles }: { battles: Battle[] }) {
+export default function CardPairStats({ 
+  battles,
+  cardNameFilter,
+  cardTypeFilters
+}: { 
+  battles: Battle[],
+  cardNameFilter: string,
+  cardTypeFilters: {
+    regular: boolean;
+    evo: boolean;
+    hero: boolean;
+  }
+}) {
   const pairStats = useMemo(() => {
     const pairMap = new Map<string, { cardA: CardId; cardB: CardId; encounters: number; wins: number }>();
 
@@ -69,12 +81,38 @@ export default function CardPairStats({ battles }: { battles: Battle[] }) {
 
   }, [battles]);
 
-  const bestMatchups = [...pairStats].sort((a, b) => {
+  const filteredPairStats = useMemo(() => {
+    let results = pairStats;
+
+    // Apply card name filter
+    if (cardNameFilter.trim()) {
+      const [name, levelStr] = cardNameFilter.split('|');
+      const level = parseInt(levelStr, 10);
+      results = results.filter(pair => 
+        (pair.cardA.name === name && pair.cardA.evolutionLevel === level) || (pair.cardB.name === name && pair.cardB.evolutionLevel === level)
+      );
+    }
+
+    // Apply card type filters
+    const noTypesSelected = !cardTypeFilters.regular && !cardTypeFilters.evo && !cardTypeFilters.hero;
+    if (!noTypesSelected) {
+      results = results.filter(pair => {
+        const isTypeA = (cardTypeFilters.regular && pair.cardA.evolutionLevel === 0) || (cardTypeFilters.evo && pair.cardA.evolutionLevel === 1) || (cardTypeFilters.hero && pair.cardA.evolutionLevel === 2);
+        const isTypeB = (cardTypeFilters.regular && pair.cardB.evolutionLevel === 0) || (cardTypeFilters.evo && pair.cardB.evolutionLevel === 1) || (cardTypeFilters.hero && pair.cardB.evolutionLevel === 2);
+        return isTypeA && isTypeB;
+      });
+    }
+
+    return results;
+  }, [pairStats, cardNameFilter, cardTypeFilters]);
+
+
+  const bestMatchups = [...filteredPairStats].sort((a, b) => {
     if (b.winRate !== a.winRate) return b.winRate - a.winRate;
     return b.wins - a.wins;
   }).slice(0, 10);
 
-  const worstMatchups = [...pairStats].sort((a, b) => {
+  const worstMatchups = [...filteredPairStats].sort((a, b) => {
     if (a.winRate !== b.winRate) return a.winRate - b.winRate;
     const lossesA = a.encounters - a.wins;
     const lossesB = b.encounters - b.wins;
@@ -118,7 +156,7 @@ export default function CardPairStats({ battles }: { battles: Battle[] }) {
     </div>
   );
 
-  if (pairStats.length === 0) return null;
+  if (filteredPairStats.length === 0) return null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

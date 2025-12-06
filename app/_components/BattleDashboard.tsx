@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Battle, Card } from "../types";
 import OpponentStatsGrid from "./OpponentStatsGrid";
 import CardPairStats from "./CardPairStats";
@@ -24,6 +24,13 @@ export default function BattleDashboard({
   cardImages: Record<string, string>
 }) {
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
+  const [cardNameFilter, setCardNameFilter] = useState<string>("");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [cardTypeFilters, setCardTypeFilters] = useState({
+    regular: false,
+    evo: false,
+    hero: false,
+  });
   const [historyPage, setHistoryPage] = useState(1);
   const MATCHES_PER_PAGE = 10;
 
@@ -87,6 +94,35 @@ export default function BattleDashboard({
       .sort((a, b) => b.games - a.games);
   }, [battles]);
 
+  // Get a sorted list of all possible opponent cards (including evolutions) for the filter dropdown
+  const opponentCardOptions = useMemo(() => {
+    const noTypesSelected = !cardTypeFilters.regular && !cardTypeFilters.evo && !cardTypeFilters.hero;
+    const isTypeActive = (level: number) => {
+      if (level === 1) return cardTypeFilters.evo;
+      if (level === 2) return cardTypeFilters.hero;
+      return cardTypeFilters.regular;
+    };
+
+    const allCards = new Map<string, { name: string; evolutionLevel: number }>();
+    battles.forEach(b => {
+      b.match_data.opponent_cards?.forEach(c => {
+        const level = c.evolution_level || 0;
+        if (noTypesSelected || isTypeActive(level)) {
+          const key = `${c.name}|${level}`;
+          if (!allCards.has(key)) {
+            allCards.set(key, { name: c.name, evolutionLevel: level });
+          }
+        }
+      });
+    });
+
+    return Array.from(allCards.values()).sort((a, b) => {
+      const nameCompare = a.name.localeCompare(b.name);
+      if (nameCompare !== 0) return nameCompare;
+      return a.evolutionLevel - b.evolutionLevel;
+    });
+  }, [battles, cardTypeFilters]);
+
   // 2. Filter Battles
   const filteredBattles = useMemo(() => {
     if (!selectedDeckId) return battles;
@@ -95,11 +131,39 @@ export default function BattleDashboard({
       return getDeckId(myCards) === selectedDeckId;
     });
   }, [battles, selectedDeckId]);
+  
+  // 2b. Filter for Match History (based on opponent cards)
+  const historyFilteredBattles = useMemo(() => {
+    let battlesToFilter = filteredBattles;
+
+    // Apply card name filter first
+    if (cardNameFilter.trim()) {
+      const [name, levelStr] = cardNameFilter.split('|');
+      const level = parseInt(levelStr, 10);
+      battlesToFilter = battlesToFilter.filter(b => 
+        b.match_data.opponent_cards?.some(card => card.name === name && (card.evolution_level || 0) === level)
+      );
+    }
+
+    // Then apply card type filters
+    const noTypesSelected = !cardTypeFilters.regular && !cardTypeFilters.evo && !cardTypeFilters.hero;
+    if (noTypesSelected) {
+      return battlesToFilter;
+    }
+
+    return battlesToFilter.filter(b => 
+      b.match_data.opponent_cards?.some(card => {
+        const level = card.evolution_level || 0;
+        return (cardTypeFilters.regular && level === 0) || (cardTypeFilters.evo && level === 1) || (cardTypeFilters.hero && level === 2);
+      })
+    );
+  }, [filteredBattles, cardNameFilter, cardTypeFilters]);
 
   // 3. Stats logic
   const overallStats = useMemo(() => {
     let wins = 0; let losses = 0; let draws = 0;
-    filteredBattles.forEach(b => {
+    // Note: Overall stats should reflect the match history filter
+    historyFilteredBattles.forEach(b => {
       if (b.result === 'victory') wins++;
       else if (b.result === 'defeat') losses++;
       else draws++;
@@ -107,26 +171,84 @@ export default function BattleDashboard({
     const total = wins + losses + draws;
     const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
     return { wins, losses, draws, winRate };
-  }, [filteredBattles]);
+  }, [historyFilteredBattles]);
 
   const paginatedHistory = useMemo(() => {
     const start = (historyPage - 1) * MATCHES_PER_PAGE;
-    return filteredBattles.slice(start, start + MATCHES_PER_PAGE);
-  }, [filteredBattles, historyPage]);
+    return historyFilteredBattles.slice(start, start + MATCHES_PER_PAGE);
+  }, [historyFilteredBattles, historyPage]);
 
-  const totalPages = Math.ceil(filteredBattles.length / MATCHES_PER_PAGE);
+  const totalPages = Math.ceil(historyFilteredBattles.length / MATCHES_PER_PAGE);
 
   const handleDeckSelect = (deckId: string | null) => {
     setSelectedDeckId(deckId);
+    // Reset other filters for a clean slate
     setHistoryPage(1);
   };
+
+  const handleCardTypeFilterChange = (type: 'regular' | 'evo' | 'hero') => {
+    setCardTypeFilters(prev => ({ ...prev, [type]: !prev[type] }));
+    // When type filters change, the single card filter might become invalid
+    setCardNameFilter('');
+    // Reset other filters for a clean slate
+    setHistoryPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedDeckId(null);
+    setCardNameFilter('');
+    setCardTypeFilters({
+      regular: false,
+      evo: false,
+      hero: false,
+    });
+    setHistoryPage(1);
+  };
+
+  const handleFilterSelect = (value: string) => {
+    setCardNameFilter(value);
+    setIsFilterOpen(false);
+  };
+
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = useMemo(() => {
+    if (!cardNameFilter) return null;
+    const [name, levelStr] = cardNameFilter.split('|');
+    const level = parseInt(levelStr, 10);
+    return opponentCardOptions.find(opt => opt.name === name && opt.evolutionLevel === level);
+  }, [cardNameFilter, opponentCardOptions]);
 
   return (
     <CardAssetsProvider images={cardImages}>
       <div className="space-y-8">
+
+        <nav className="sticky top-0 bg-gray-950/80 backdrop-blur-sm py-3 z-30 border-b border-gray-800 -mx-6 px-6">
+          <div className="flex justify-center items-center gap-4 sm:gap-8">
+            <a href="#deck-filter" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Decks</a>
+            <a href="#opponent-stats" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Opponent Stats</a>
+            <a href="#synergy-analysis" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Synergy</a>
+            <a href="#match-history" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">History</a>
+          </div>
+        </nav>
         
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-6 overflow-x-auto">
-          <h2 className="text-xl font-bold text-white mb-4 sticky left-0">Filter by Your Deck</h2>
+        <section 
+          id="deck-filter" 
+          className="bg-gray-900 border border-gray-800 rounded-xl p-6 overflow-x-auto"
+          style={{ scrollMarginTop: '80px' }} // Offset for sticky nav
+        >
+          <h2 className="text-xl font-bold text-white mb-4 sticky left-0">
+            Filter by Your Deck
+          </h2>
           <div className="flex gap-4 min-w-min">
             <button
               onClick={() => handleDeckSelect(null)}
@@ -172,13 +294,83 @@ export default function BattleDashboard({
           </div>
         </section>
 
-        <div className="flex flex-wrap items-end gap-4 pb-4 border-b border-gray-800">
-          <h2 className="text-2xl font-bold text-white">
-            {selectedDeckId ? "Deck Performance" : "Overall Performance"}
-          </h2>
+        <div className="flex flex-col md:flex-row md:items-end gap-4 pb-4 border-b border-gray-800">
+          <div className="flex-grow">
+            <h2 className="text-2xl font-bold text-white">
+              {selectedDeckId ? "Deck Performance" : "Overall Performance"}
+            </h2>
+            <div className="mt-2 flex flex-col sm:flex-row gap-4">
+              <div className="relative w-full sm:w-72 z-20" ref={filterRef}>
+                <button
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
+                >
+                  {selectedOption ? (
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-6 h-8">
+                        <CardImage name={selectedOption.name} evolutionLevel={selectedOption.evolutionLevel} className="w-full h-full" />
+                      </div>
+                      <span>
+                        {selectedOption.name}
+                        {selectedOption.evolutionLevel === 1 ? ' (Evo)' : ''}
+                        {selectedOption.evolutionLevel === 2 ? ' (Hero)' : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Filter by opponent card...</span>
+                  )}
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20" className={`w-5 h-5 text-gray-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`}><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 8l4 4 4-4"/></svg>
+                </button>
+
+                {isFilterOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg z-10 max-h-80 overflow-y-auto shadow-lg">
+                    <ul>
+                      <li 
+                        onClick={() => handleFilterSelect('')}
+                        className="px-4 py-2 text-gray-400 hover:bg-gray-700 cursor-pointer"
+                      >
+                        - Clear Filter -
+                      </li>
+                      {opponentCardOptions.map(card => (
+                        <li
+                          key={`${card.name}|${card.evolutionLevel}`}
+                          onClick={() => handleFilterSelect(`${card.name}|${card.evolutionLevel}`)}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-blue-600 cursor-pointer rounded-md m-1"
+                        >
+                          <div className="relative w-8 h-10 shrink-0">
+                            <CardImage
+                              name={card.name}
+                              evolutionLevel={card.evolutionLevel}
+                              className="w-full h-full"
+                            />
+                          </div>
+                          <span className="text-white font-medium">
+                            {card.name}
+                            {card.evolutionLevel === 1 ? ' (Evo)' : ''}
+                            {card.evolutionLevel === 2 ? ' (Hero)' : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                {(['regular', 'evo', 'hero'] as const).map(type => (
+                  <label key={type} className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                    <input type="checkbox" checked={cardTypeFilters[type]} onChange={() => handleCardTypeFilterChange(type)} className="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500" />
+                    <span className="capitalize">{type === 'hero' ? 'Heroes' : `${type}s`}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="pt-2">
+                <button onClick={handleResetFilters} className="text-sm text-gray-400 hover:text-white hover:bg-gray-700 px-3 py-1.5 rounded-lg transition-colors">Reset Filters</button>
+              </div>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
-              {filteredBattles.length} Matches
+              {historyFilteredBattles.length} Matches
             </span>
             <span className="text-sm font-bold bg-gray-900 px-4 py-1 rounded-full border border-gray-800 flex items-center gap-1.5 shadow-sm">
               <span className={`mr-2 ${overallStats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
@@ -192,17 +384,28 @@ export default function BattleDashboard({
           </div>
         </div>
 
-        <section>
-          <OpponentStatsGrid battles={filteredBattles} />
+        <section 
+          id="opponent-stats" 
+          className="relative z-10"
+          style={{ scrollMarginTop: '80px' }} // Offset for sticky nav
+        >
+          <OpponentStatsGrid battles={filteredBattles} cardNameFilter={cardNameFilter} cardTypeFilters={cardTypeFilters} />
         </section>
 
-        <section className="bg-gray-900/50 p-6 rounded-xl border border-gray-800">
+        <section 
+          id="synergy-analysis" 
+          className="bg-gray-900/50 p-6 rounded-xl border border-gray-800"
+          style={{ scrollMarginTop: '80px' }} // Offset for sticky nav
+        >
           <h2 className="text-2xl font-bold text-white mb-6">Synergy Analysis</h2>
-          <CardPairStats battles={filteredBattles} />
+          <CardPairStats battles={filteredBattles} cardNameFilter={cardNameFilter} cardTypeFilters={cardTypeFilters} />
         </section>
 
-        <section>
-          <h3 className="text-xl font-bold text-white mb-4">Match History</h3>
+        <section 
+          id="match-history"
+          style={{ scrollMarginTop: '80px' }} // Offset for sticky nav
+        >
+          <h2 className="text-2xl font-bold text-white mb-6">Match History</h2>
           <MatchHistory battles={paginatedHistory} />
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-4 mt-6">

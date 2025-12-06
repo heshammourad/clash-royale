@@ -13,7 +13,19 @@ interface CardStat {
   usageRate: number;  
 }
 
-export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
+export default function OpponentStatsGrid({ 
+  battles,
+  cardNameFilter,
+  cardTypeFilters
+}: { 
+  battles: Battle[],
+  cardNameFilter: string,
+  cardTypeFilters: {
+    regular: boolean;
+    evo: boolean;
+    hero: boolean;
+  }
+}) {
   const [sortMetric, setSortMetric] = useState<"usage" | "winRate">("usage");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -76,6 +88,30 @@ export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
     });
   }, [stats, sortMetric, sortDirection]);
 
+  // 3. Filter Data
+  const filteredAndSortedStats = useMemo(() => {
+    let results = sortedStats;
+
+    // Apply card name filter
+    if (cardNameFilter.trim()) {
+      const [name, levelStr] = cardNameFilter.split('|');
+      results = results.filter(stat => 
+        stat.name === name && stat.evolutionLevel === parseInt(levelStr, 10)
+      );
+    }
+
+    // Apply card type filters
+    const noTypesSelected = !cardTypeFilters.regular && !cardTypeFilters.evo && !cardTypeFilters.hero;
+    if (!noTypesSelected) {
+      results = results.filter(stat => {
+        const level = stat.evolutionLevel;
+        return (cardTypeFilters.regular && level === 0) || (cardTypeFilters.evo && level === 1) || (cardTypeFilters.hero && level === 2);
+      });
+    }
+
+    return results;
+  }, [sortedStats, cardNameFilter, cardTypeFilters]);
+
   const handleSort = (metric: "usage" | "winRate") => {
     if (sortMetric === metric) {
       setSortDirection(sortDirection === "desc" ? "asc" : "desc");
@@ -100,7 +136,7 @@ export default function OpponentStatsGrid({ battles }: { battles: Battle[] }) {
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-        {sortedStats.map((stat) => {
+        {filteredAndSortedStats.map((stat) => {
           const isEvo = stat.evolutionLevel === 1;
           const isHero = stat.evolutionLevel === 2;
 
