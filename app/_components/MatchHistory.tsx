@@ -1,11 +1,12 @@
 "use client";
 
+import LocalTime from './LocalTime';
 import { Battle, Card } from "../types";
 import CardImage from "./CardImage";
 
 const formatGameMode = (mode: string) => {
   switch (mode) {
-    case 'trail': 
+    case 'trail':
     case 'PvP': return 'Trophy Road';
     case 'pathOfLegend':
     case 'pathOfLegends': return 'Ranked';
@@ -29,7 +30,7 @@ const DeckGrid = ({ cards }: { cards: Card[] }) => {
       {safeCards.map((card, i) => (
         <div key={i} className="relative aspect-[3/4] bg-gray-800 rounded-sm overflow-hidden border border-gray-700">
           {card ? (
-            <CardImage 
+            <CardImage
               name={card.name}
               evolutionLevel={card.evolution_level}
               className="w-full h-full"
@@ -52,30 +53,32 @@ export default function MatchHistory({ battles }: { battles: Battle[] }) {
         const oppCrowns = battle.match_data.opponent_crowns ?? 0;
 
         return (
-          <div 
+          <div
             key={`${battle.player_tag}-${battle.battle_time}-${battle.round_id}`}
-            className={`flex flex-col md:flex-row items-center gap-4 p-3 rounded-xl border-l-4 shadow-sm transition-all hover:bg-gray-800/50 ${
-              isWin 
-                ? "bg-gray-900 border-l-green-500" 
+            className={`flex flex-col md:flex-row items-center gap-4 p-3 rounded-xl border-l-4 shadow-sm transition-all hover:bg-gray-800/50 ${isWin
+                ? "bg-gray-900 border-l-green-500"
                 : "bg-gray-900 border-l-red-500"
-            }`}
+              }`}
           >
             <div className="flex flex-row md:flex-col justify-between md:justify-center items-center md:items-start w-full md:w-24 shrink-0 gap-1">
-              <span className={`text-sm font-black uppercase tracking-wider ${
-                isWin ? "text-green-400" : "text-red-400"
-              }`}>
+              <span className={`text-sm font-black uppercase tracking-wider ${isWin ? "text-green-400" : "text-red-400"
+                }`}>
                 {isWin ? "Victory" : "Defeat"}
               </span>
-              <span className="text-xs text-gray-500" suppressHydrationWarning>
-                {new Date(battle.battle_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-              <span className="text-[10px] text-gray-600 font-mono" suppressHydrationWarning>
-                {new Date(battle.battle_time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-              </span>
+              <LocalTime
+                date={battle.battle_time}
+                formatString="MMM d"
+                className="text-xs text-gray-500"
+              />
+              <LocalTime
+                date={battle.battle_time}
+                formatString="p"
+                className="text-[10px] text-gray-600 font-mono"
+              />
             </div>
 
             <div className="flex flex-1 items-center justify-between gap-4 w-full">
-              
+
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] text-gray-400 uppercase font-bold">You</span>
                 <DeckGrid cards={battle.match_data.my_cards} />
